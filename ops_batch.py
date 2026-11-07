@@ -8,7 +8,7 @@ import bpy
 from bpy.props import BoolProperty, EnumProperty, FloatProperty, StringProperty
 from mathutils import kdtree
 
-from . import order, state
+from . import order, sides, state
 
 # Blender の頂点グループ名は終端文字を含めて 64 バイトまで
 MAX_NAME_BYTES = 63
@@ -215,6 +215,117 @@ class L0C_VGU_OT_rename(_MeshPoll, bpy.types.Operator):
         if duplicates:
             return f"変更後の名前が重複します: {', '.join(sorted(set(duplicates)))}"
         return None
+
+
+class L0C_VGU_OT_create_opposite(_MeshPoll, bpy.types.Operator):
+    bl_idname = "l0c_vgu.create_opposite"
+    bl_label = "逆側のグループを生成"
+    bl_description = "選択中の L/R のグループから逆側のグループを作り、元のグループの直後に置きます"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    weight_mode: EnumProperty(
+        name="ウェイト",
+        items=(
+            ('MIRROR', "X 軸で反転してコピー", "元のグループのウェイトを X 軸で反転してコピーします"),
+            ('EMPTY', "空のグループ", "名前だけ作り、ウェイトはコピーしません"),
+        ),
+    )
+    use_topology: BoolProperty(
+        name="トポロジーミラー",
+        description="頂点の位置ではなくメッシュのつながりで反対側の頂点を探します",
+        default=False,
+    )
+
+    def invoke(self, context, _event):
+        if not state.selected_names(state.mesh_object(context)):
+            self.report({'ERROR'}, "グループが選択されていません。")
+            return {'CANCELLED'}
+        return context.window_manager.invoke_props_dialog(self, width=320)
+
+    def draw(self, _context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+        layout.prop(self, "weight_mode")
+        if self.weight_mode == 'MIRROR':
+            layout.prop(self, "use_topology")
+
+    def execute(self, context):
+        ob = state.mesh_object(context)
+        names = _require_selected(self, ob)
+        if not names:
+            return {'CANCELLED'}
+
+        vgroups = ob.vertex_groups
+        jobs = []
+        no_side = []
+        existing = []
+        for name in names:
+            opposite = sides.opposite_name(name)
+            if opposite is None:
+                no_side.append(name)
+            elif vgroups.get(opposite) is not None:
+                existing.append(opposite)
+            else:
+                jobs.append((name, opposite))
+
+        active = vgroups.active
+        active_name = active.name if active is not None else None
+        created = {}
+        try:
+            for source, opposite in jobs:
+                self._create(context, ob, source, opposite)
+                created[source] = opposite
+        except RuntimeError as e:
+            self.report({'ERROR'}, str(e))
+            return {'CANCELLED'}
+        finally:
+            if active_name is not None and vgroups.get(active_name) is not None:
+                vgroups.active_index = vgroups[active_name].index
+
+        if created:
+            new_names = set(created.values())
+            desired = []
+            for name in (vg.name for vg in vgroups):
+                if name in new_names:
+                    continue
+                desired.append(name)
+                if name in created:
+                    desired.append(created[name])
+            try:
+                order.apply_order(context, ob, desired)
+            except (ValueError, RuntimeError) as e:
+                self.report({'ERROR'}, str(e))
+                return {'CANCELLED'}
+        state.sync(ob)
+
+        messages = [f"{len(created)} 個のグループを生成しました。"]
+        if existing:
+            messages.append(f"逆側が既にあるためスキップ: {', '.join(existing)}")
+        if no_side:
+            messages.append(f"L/R のサフィックスがないためスキップ: {', '.join(no_side)}")
+        self.report({'WARNING'} if existing or no_side else {'INFO'}, " ".join(messages))
+        return {'FINISHED'}
+
+    def _create(self, context, ob, source, opposite):
+        vgroups = ob.vertex_groups
+        if self.weight_mode == 'EMPTY':
+            vgroups.new(name=opposite)
+            return
+
+        vgroups.active_index = vgroups[source].index
+        with context.temp_override(object=ob, active_object=ob):
+            if 'FINISHED' not in bpy.ops.object.vertex_group_copy():
+                raise RuntimeError(f"「{source}」をコピーできませんでした。")
+            copied = vgroups.active
+            if 'FINISHED' not in bpy.ops.object.vertex_group_mirror(
+                mirror_weights=True,
+                flip_group_names=False,
+                all_groups=False,
+                use_topology=self.use_topology,
+            ):
+                raise RuntimeError(f"「{source}」のウェイトを反転できませんでした。")
+        copied.name = opposite
 
 
 class L0C_VGU_OT_vertex_assign(_MeshPoll, bpy.types.Operator):
@@ -428,6 +539,7 @@ classes = (
     L0C_VGU_OT_delete_selected,
     L0C_VGU_OT_set_lock,
     L0C_VGU_OT_rename,
+    L0C_VGU_OT_create_opposite,
     L0C_VGU_OT_vertex_assign,
     L0C_VGU_OT_copy_to_selected,
 )

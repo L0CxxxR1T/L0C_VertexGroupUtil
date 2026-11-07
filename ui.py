@@ -112,6 +112,7 @@ class L0C_VGU_MT_batch(bpy.types.Menu):
     def draw(self, _context):
         layout = self.layout
         layout.operator("l0c_vgu.rename", text="リネーム...", icon='SORTALPHA')
+        layout.operator("l0c_vgu.create_opposite", text="逆側のグループを生成...", icon='MOD_MIRROR')
         layout.operator("l0c_vgu.copy_to_selected", text="他オブジェクトへコピー...", icon='COPYDOWN')
         layout.separator()
         layout.operator("l0c_vgu.set_lock", text="ロック", icon='LOCKED').action = 'LOCK'
@@ -186,6 +187,9 @@ def _draw_selection_tools(layout, ob, selected_count):
     sub.operator("l0c_vgu.select_all", text="全解除", icon='CHECKBOX_DEHLT').action = 'DESELECT'
     sub.operator("l0c_vgu.select_all", text="反転").action = 'INVERT'
     sub.operator("l0c_vgu.select_range", text="範囲")
+    sub = row.row(align=True)
+    sub.operator("l0c_vgu.select_side", text="L").side = 'L'
+    sub.operator("l0c_vgu.select_side", text="R").side = 'R'
     sub = row.row()
     sub.alignment = 'RIGHT'
     sub.label(text=f"{selected_count} / {len(ob.vertex_groups)}")
