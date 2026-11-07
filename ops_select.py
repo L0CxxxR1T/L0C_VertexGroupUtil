@@ -3,9 +3,9 @@
 """チェックボックスの選択操作。"""
 
 import bpy
-from bpy.props import EnumProperty, StringProperty
+from bpy.props import BoolProperty, EnumProperty, StringProperty
 
-from . import state
+from . import sides, state
 
 
 class L0C_VGU_OT_select_all(bpy.types.Operator):
@@ -77,6 +77,52 @@ class L0C_VGU_OT_select_range(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class L0C_VGU_OT_select_side(bpy.types.Operator):
+    bl_idname = "l0c_vgu.select_side"
+    bl_label = "L/R で選択"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    side: EnumProperty(
+        name="側",
+        items=(
+            ('L', "L", ""),
+            ('R', "R", ""),
+        ),
+    )
+    extend: BoolProperty(
+        name="追加選択",
+        description="今の選択を残したまま追加します",
+        default=False,
+    )
+
+    @classmethod
+    def description(cls, _context, properties):
+        return (
+            f"名前が .{properties.side} や _{properties.side.lower()} などで終わるグループを選択します。"
+            "Shift+クリックで今の選択に追加します"
+        )
+
+    @classmethod
+    def poll(cls, context):
+        ob = state.mesh_object(context)
+        return ob is not None and len(ob.vertex_groups) > 0
+
+    def invoke(self, context, event):
+        self.extend = event.shift
+        return self.execute(context)
+
+    def execute(self, context):
+        ob = state.mesh_object(context)
+        names = [vg.name for vg in ob.vertex_groups]
+        matched = [n for n in names if sides.side_of(n) == self.side]
+        if not self.extend:
+            state.set_selected(ob, names, False)
+        state.set_selected(ob, matched, True)
+        if not matched:
+            self.report({'INFO'}, f"{self.side} 側のグループはありませんでした。")
+        return {'FINISHED'}
+
+
 class L0C_VGU_OT_toggle(bpy.types.Operator):
     """選択状態がまだ同期されていないグループ用のチェックボックス"""
 
@@ -105,6 +151,7 @@ class L0C_VGU_OT_toggle(bpy.types.Operator):
 classes = (
     L0C_VGU_OT_select_all,
     L0C_VGU_OT_select_range,
+    L0C_VGU_OT_select_side,
     L0C_VGU_OT_toggle,
 )
 

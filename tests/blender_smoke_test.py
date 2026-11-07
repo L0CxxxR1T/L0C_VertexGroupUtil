@@ -12,6 +12,7 @@ import bpy
 
 PACKAGE = "bl_ext.user_default.l0c_vertex_group_util"
 order = importlib.import_module(PACKAGE + ".order")
+sides = importlib.import_module(PACKAGE + ".sides")
 state = importlib.import_module(PACKAGE + ".state")
 prefs_module = importlib.import_module(PACKAGE + ".prefs")
 
@@ -205,6 +206,51 @@ def test_batch_ops():
           [round(bpy.context.scene.tool_settings.vertex_group_weight, 3)] * 4)
 
 
+def test_sides():
+    check("side names", [sides.side_of(n) for n in ["Arm.L", "arm_r", "Hair.l.001", "Leg_R", "Body", "L", "ArmL", "Arm-L"]],
+          ["L", "R", "L", "R", None, None, None, None])
+    check("opposite names", [sides.opposite_name(n) for n in ["Arm.L", "arm_r", "Hair.l.001", "Body"]],
+          ["Arm.R", "arm_l", "Hair.r.001", None])
+
+    ob = make_mesh("_vgu_sides", ["Arm.L", "Arm.R", "leg_l", "Body", "Hand_R"])
+    select(ob, ["Body"])
+    run(ob, bpy.ops.l0c_vgu.select_side, side='L')
+    check("select L", selected(ob), ["Arm.L", "leg_l"])
+    run(ob, bpy.ops.l0c_vgu.select_side, side='R', extend=True)
+    check("extend R", selected(ob), ["Arm.L", "Arm.R", "leg_l", "Hand_R"])
+
+
+def test_create_opposite():
+    me = bpy.data.meshes.new("_vgu_mirror")
+    me.from_pydata([(-1, 0, 0), (1, 0, 0), (0, 1, 0)], [], [(0, 1, 2)])
+    ob = bpy.data.objects.new("_vgu_mirror", me)
+    bpy.context.scene.collection.objects.link(ob)
+    created.append(ob)
+    for n in ["Arm.L", "Arm.R", "leg_l", "Body", "Hand_R"]:
+        ob.vertex_groups.new(name=n)
+    ob.vertex_groups["leg_l"].add([1], 0.7, 'REPLACE')
+    ob.vertex_groups["Hand_R"].add([0], 0.4, 'REPLACE')
+    ob.vertex_groups.active_index = 3
+    state.sync(ob)
+
+    select(ob, ["Arm.L", "leg_l", "Body", "Hand_R"])
+    try:
+        run(ob, bpy.ops.l0c_vgu.create_opposite, weight_mode='MIRROR')
+    except RuntimeError as e:
+        # スキップを WARNING で報告するので、ERROR 以外は例外にならない
+        failures.append(f"create opposite: {e}")
+    check("opposite order", names(ob), ["Arm.L", "Arm.R", "leg_l", "leg_r", "Body", "Hand_R", "Hand_L"])
+    check("opposite active", ob.vertex_groups.active.name, "Body")
+    check("opposite mirrored", round(ob.vertex_groups["leg_r"].weight(0), 3), 0.7)
+    check("opposite mirrored 2", round(ob.vertex_groups["Hand_L"].weight(1), 3), 0.4)
+    check("opposite source kept", round(ob.vertex_groups["leg_l"].weight(1), 3), 0.7)
+
+    select(ob, ["Body", "Arm.L"])
+    ob.vertex_groups.remove(ob.vertex_groups["Arm.R"])
+    run(ob, bpy.ops.l0c_vgu.create_opposite, weight_mode='EMPTY')
+    check("opposite empty", names(ob)[:2], ["Arm.L", "Arm.R"])
+
+
 def test_copy():
     src = make_mesh("_vgu_src", ["A", "B", "C"])
     dst = make_mesh("_vgu_dst", ["C", "X", "A"], offset=(0.0, 0.0, 0.0))
@@ -228,7 +274,8 @@ def test_copy():
 try:
     if bpy.context.object is not None and bpy.context.object.mode != 'OBJECT':
         bpy.ops.object.mode_set(mode='OBJECT')
-    for test in (test_pure, test_apply_order, test_sync, test_select_ops, test_sort_ops, test_batch_ops, test_copy):
+    for test in (test_pure, test_apply_order, test_sync, test_select_ops, test_sort_ops, test_batch_ops,
+                 test_sides, test_create_opposite, test_copy):
         try:
             test()
         except Exception as e:
