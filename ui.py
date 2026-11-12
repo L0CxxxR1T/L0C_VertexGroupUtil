@@ -183,8 +183,8 @@ def draw_panel(panel, context):
 def _draw_selection_tools(layout, ob, selected_count):
     row = layout.row()
     sub = row.row(align=True)
-    sub.operator("l0c_vgu.select_all", text="全選択", icon='CHECKBOX_HLT').action = 'SELECT'
-    sub.operator("l0c_vgu.select_all", text="全解除", icon='CHECKBOX_DEHLT').action = 'DESELECT'
+    sub.operator("l0c_vgu.select_all", text="", icon='CHECKBOX_HLT').action = 'SELECT'
+    sub.operator("l0c_vgu.select_all", text="", icon='CHECKBOX_DEHLT').action = 'DESELECT'
     sub.operator("l0c_vgu.select_all", text="反転").action = 'INVERT'
     sub.operator("l0c_vgu.select_range", text="範囲")
     sub = row.row(align=True)
