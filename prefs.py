@@ -6,6 +6,8 @@ import csv
 import os
 
 import bpy
+from bpy.app.translations import pgettext_iface as iface_
+from bpy.app.translations import pgettext_rpt as rpt_
 from bpy.props import BoolProperty, CollectionProperty, IntProperty, StringProperty
 from bpy_extras.io_utils import ExportHelper, ImportHelper
 
@@ -42,7 +44,7 @@ def _on_replace_panel_update(_self, context):
 
 
 class L0C_VGU_Dictionary(bpy.types.PropertyGroup):
-    source_path: StringProperty(name="読み込み元", subtype='FILE_PATH')
+    source_path: StringProperty(name="Source File", subtype='FILE_PATH')
     entries: StringProperty()
 
     def get_entries(self):
@@ -56,15 +58,15 @@ class L0C_VGU_UL_dictionaries(bpy.types.UIList):
     def draw_item(self, _context, layout, _data, item, _icon, _active_data, _active_propname, _index):
         row = layout.row()
         row.prop(item, "name", text="", emboss=False, icon='SORTALPHA')
-        row.label(text=f"{len(item.get_entries())} 行")
+        row.label(text=iface_("{count} lines").format(count=len(item.get_entries())), translate=False)
 
 
 class L0C_VGU_Preferences(bpy.types.AddonPreferences):
     bl_idname = __package__
 
     replace_panel: BoolProperty(
-        name="標準の頂点グループパネルを置き換える",
-        description="オフにすると標準のパネル表示に戻します",
+        name="Replace Default Vertex Group Panel",
+        description="Turn this off to restore the default panel",
         default=True,
         update=_on_replace_panel_update,
     )
@@ -76,7 +78,7 @@ class L0C_VGU_Preferences(bpy.types.AddonPreferences):
         layout.prop(self, "replace_panel")
 
         layout.separator()
-        layout.label(text="並べ替え用の辞書")
+        layout.label(text="Sorting Dictionaries")
         row = layout.row()
         row.template_list(
             "L0C_VGU_UL_dictionaries", "", self, "dictionaries",
@@ -96,9 +98,10 @@ class L0C_VGU_Preferences(bpy.types.AddonPreferences):
             entries = dictionary.get_entries()
             col = box.column(align=True)
             for entry in entries[:10]:
-                col.label(text=entry)
+                # 辞書の行はユーザーデータなので翻訳しない
+                col.label(text=entry, translate=False)
             if len(entries) > 10:
-                col.label(text=f"ほか {len(entries) - 10} 行")
+                col.label(text=iface_("and {count} more lines").format(count=len(entries) - 10), translate=False)
 
     def active_dictionary(self):
         if 0 <= self.active_dictionary_index < len(self.dictionaries):
@@ -118,8 +121,8 @@ def _unique_dictionary_name(prefs, base):
 
 class L0C_VGU_OT_dictionary_import(bpy.types.Operator, ImportHelper):
     bl_idname = "l0c_vgu.dictionary_import"
-    bl_label = "辞書を読み込む"
-    bl_description = "CSV を読み込んで並べ替え用の辞書として登録します"
+    bl_label = "Import Dictionary"
+    bl_description = "Import a CSV file and register it as a sorting dictionary"
 
     filename_ext = ".csv"
     filter_glob: StringProperty(default="*.csv;*.txt", options={'HIDDEN'})
@@ -129,10 +132,10 @@ class L0C_VGU_OT_dictionary_import(bpy.types.Operator, ImportHelper):
         try:
             entries = read_dictionary_csv(self.filepath)
         except (OSError, UnicodeDecodeError, csv.Error) as e:
-            self.report({'ERROR'}, f"辞書を読み込めませんでした: {e}")
+            self.report({'ERROR'}, rpt_("Could not read the dictionary: {error}").format(error=e))
             return {'CANCELLED'}
         if not entries:
-            self.report({'ERROR'}, "辞書に有効な行がありません。")
+            self.report({'ERROR'}, rpt_("The dictionary has no valid lines."))
             return {'CANCELLED'}
 
         dictionary = prefs.dictionaries.add()
@@ -142,14 +145,16 @@ class L0C_VGU_OT_dictionary_import(bpy.types.Operator, ImportHelper):
         dictionary.set_entries(entries)
         prefs.active_dictionary_index = len(prefs.dictionaries) - 1
         context.preferences.is_dirty = True
-        self.report({'INFO'}, f"辞書「{dictionary.name}」を {len(entries)} 行で登録しました。")
+        self.report({'INFO'}, rpt_("Registered dictionary \"{name}\" with {count} lines.").format(
+            name=dictionary.name, count=len(entries),
+        ))
         return {'FINISHED'}
 
 
 class L0C_VGU_OT_dictionary_reload(bpy.types.Operator):
     bl_idname = "l0c_vgu.dictionary_reload"
-    bl_label = "辞書を再読み込み"
-    bl_description = "読み込み元の CSV から辞書を読み直します"
+    bl_label = "Reload Dictionary"
+    bl_description = "Reload the dictionary from its source CSV file"
 
     @classmethod
     def poll(cls, context):
@@ -163,21 +168,23 @@ class L0C_VGU_OT_dictionary_reload(bpy.types.Operator):
         try:
             entries = read_dictionary_csv(path)
         except (OSError, UnicodeDecodeError, csv.Error) as e:
-            self.report({'ERROR'}, f"辞書を読み込めませんでした: {e}")
+            self.report({'ERROR'}, rpt_("Could not read the dictionary: {error}").format(error=e))
             return {'CANCELLED'}
         if not entries:
-            self.report({'ERROR'}, "辞書に有効な行がありません。")
+            self.report({'ERROR'}, rpt_("The dictionary has no valid lines."))
             return {'CANCELLED'}
         dictionary.set_entries(entries)
         context.preferences.is_dirty = True
-        self.report({'INFO'}, f"辞書「{dictionary.name}」を {len(entries)} 行で読み直しました。")
+        self.report({'INFO'}, rpt_("Reloaded dictionary \"{name}\" with {count} lines.").format(
+            name=dictionary.name, count=len(entries),
+        ))
         return {'FINISHED'}
 
 
 class L0C_VGU_OT_dictionary_remove(bpy.types.Operator):
     bl_idname = "l0c_vgu.dictionary_remove"
-    bl_label = "辞書を削除"
-    bl_description = "選択中の辞書を登録から外します。CSV ファイルは削除しません"
+    bl_label = "Remove Dictionary"
+    bl_description = "Remove the active dictionary from the list. The CSV file is not deleted"
 
     @classmethod
     def poll(cls, context):
@@ -194,8 +201,8 @@ class L0C_VGU_OT_dictionary_remove(bpy.types.Operator):
 
 class L0C_VGU_OT_dictionary_export(bpy.types.Operator, ExportHelper):
     bl_idname = "l0c_vgu.dictionary_export"
-    bl_label = "辞書を書き出す"
-    bl_description = "選択中の辞書を CSV に書き出します"
+    bl_label = "Export Dictionary"
+    bl_description = "Export the active dictionary to a CSV file"
 
     filename_ext = ".csv"
     filter_glob: StringProperty(default="*.csv", options={'HIDDEN'})
@@ -213,9 +220,9 @@ class L0C_VGU_OT_dictionary_export(bpy.types.Operator, ExportHelper):
                 for entry in dictionary.get_entries():
                     writer.writerow([entry])
         except OSError as e:
-            self.report({'ERROR'}, f"辞書を書き出せませんでした: {e}")
+            self.report({'ERROR'}, rpt_("Could not write the dictionary: {error}").format(error=e))
             return {'CANCELLED'}
-        self.report({'INFO'}, f"辞書「{dictionary.name}」を書き出しました。")
+        self.report({'INFO'}, rpt_("Exported dictionary \"{name}\".").format(name=dictionary.name))
         return {'FINISHED'}
 
 

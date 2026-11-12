@@ -5,6 +5,9 @@
 import re
 
 import bpy
+from bpy.app.translations import pgettext_iface as iface_
+from bpy.app.translations import pgettext_rpt as rpt_
+from bpy.app.translations import pgettext_tip as tip_
 from bpy.props import BoolProperty, EnumProperty, FloatProperty, StringProperty
 from mathutils import kdtree
 
@@ -17,7 +20,7 @@ MAX_NAME_BYTES = 63
 def _require_selected(op, ob):
     names = state.selected_names(ob)
     if not names:
-        op.report({'ERROR'}, "グループが選択されていません。")
+        op.report({'ERROR'}, rpt_("No groups are selected."))
     return names
 
 
@@ -30,20 +33,20 @@ class _MeshPoll:
 
 class L0C_VGU_OT_delete_selected(_MeshPoll, bpy.types.Operator):
     bl_idname = "l0c_vgu.delete_selected"
-    bl_label = "選択中のグループを削除"
-    bl_description = "選択中の頂点グループを削除します"
+    bl_label = "Delete Selected Groups"
+    bl_description = "Delete the selected vertex groups"
     bl_options = {'REGISTER', 'UNDO'}
 
     def invoke(self, context, event):
         count = len(state.selected_names(state.mesh_object(context)))
         if count == 0:
-            self.report({'ERROR'}, "グループが選択されていません。")
+            self.report({'ERROR'}, rpt_("No groups are selected."))
             return {'CANCELLED'}
         return context.window_manager.invoke_confirm(
             self, event,
-            title="選択中のグループを削除",
-            message=f"{count} 個の頂点グループを削除します。",
-            confirm_text="削除",
+            title=iface_("Delete Selected Groups"),
+            message=iface_("Delete {count} vertex groups.").format(count=count),
+            confirm_text=iface_("Delete"),
             icon='WARNING',
         )
 
@@ -55,31 +58,31 @@ class L0C_VGU_OT_delete_selected(_MeshPoll, bpy.types.Operator):
         for name in names:
             ob.vertex_groups.remove(ob.vertex_groups[name])
         state.sync(ob)
-        self.report({'INFO'}, f"{len(names)} 個の頂点グループを削除しました。")
+        self.report({'INFO'}, rpt_("Deleted {count} vertex groups.").format(count=len(names)))
         return {'FINISHED'}
 
 
 class L0C_VGU_OT_set_lock(_MeshPoll, bpy.types.Operator):
     bl_idname = "l0c_vgu.set_lock"
-    bl_label = "選択中のグループのロック"
+    bl_label = "Lock Selected Groups"
     bl_options = {'REGISTER', 'UNDO'}
 
     action: EnumProperty(
-        name="操作",
+        name="Action",
         items=(
-            ('LOCK', "ロック", ""),
-            ('UNLOCK', "ロック解除", ""),
-            ('INVERT', "ロック反転", ""),
+            ('LOCK', "Lock", ""),
+            ('UNLOCK', "Unlock", ""),
+            ('INVERT', "Invert Lock", ""),
         ),
     )
 
     @classmethod
     def description(cls, _context, properties):
-        return {
-            'LOCK': "選択中のグループをロックします",
-            'UNLOCK': "選択中のグループのロックを解除します",
-            'INVERT': "選択中のグループのロックをそれぞれ反転します",
-        }[properties.action]
+        return tip_({
+            'LOCK': "Lock the selected groups",
+            'UNLOCK': "Unlock the selected groups",
+            'INVERT': "Invert the lock of each selected group",
+        }[properties.action])
 
     def execute(self, context):
         ob = state.mesh_object(context)
@@ -97,29 +100,29 @@ class L0C_VGU_OT_set_lock(_MeshPoll, bpy.types.Operator):
 
 class L0C_VGU_OT_rename(_MeshPoll, bpy.types.Operator):
     bl_idname = "l0c_vgu.rename"
-    bl_label = "選択中のグループをリネーム"
-    bl_description = "選択中の頂点グループの名前をまとめて変更します"
+    bl_label = "Rename Selected Groups"
+    bl_description = "Rename the selected vertex groups at once"
     bl_options = {'REGISTER', 'UNDO'}
 
     mode: EnumProperty(
-        name="方法",
+        name="Method",
         items=(
-            ('ADD_PREFIX', "接頭辞を追加", ""),
-            ('ADD_SUFFIX', "接尾辞を追加", ""),
-            ('REMOVE_PREFIX', "接頭辞を削除", ""),
-            ('REMOVE_SUFFIX', "接尾辞を削除", ""),
-            ('REPLACE', "置換", ""),
-            ('FLIP', "L/R を入れ替え", ""),
+            ('ADD_PREFIX', "Add Prefix", ""),
+            ('ADD_SUFFIX', "Add Suffix", ""),
+            ('REMOVE_PREFIX', "Remove Prefix", ""),
+            ('REMOVE_SUFFIX', "Remove Suffix", ""),
+            ('REPLACE', "Replace", ""),
+            ('FLIP', "Flip L/R", ""),
         ),
     )
-    text: StringProperty(name="文字列")
-    find: StringProperty(name="検索")
-    replace: StringProperty(name="置換後")
-    use_regex: BoolProperty(name="正規表現", default=False)
+    text: StringProperty(name="Text")
+    find: StringProperty(name="Find")
+    replace: StringProperty(name="Replace With")
+    use_regex: BoolProperty(name="Regular Expression", default=False)
 
     def invoke(self, context, _event):
         if not state.selected_names(state.mesh_object(context)):
-            self.report({'ERROR'}, "グループが選択されていません。")
+            self.report({'ERROR'}, rpt_("No groups are selected."))
             return {'CANCELLED'}
         return context.window_manager.invoke_props_dialog(self, width=320)
 
@@ -161,18 +164,18 @@ class L0C_VGU_OT_rename(_MeshPoll, bpy.types.Operator):
             try:
                 regex = re.compile(self.find)
             except re.error as e:
-                self.report({'ERROR'}, f"正規表現が正しくありません: {e}")
+                self.report({'ERROR'}, rpt_("Invalid regular expression: {error}").format(error=e))
                 return {'CANCELLED'}
 
         try:
             renames = {name: self._new_name(name, regex) for name in names}
         except (re.error, IndexError) as e:
             # 置換後の文字列に存在しないグループ参照があるとき
-            self.report({'ERROR'}, f"置換に失敗しました: {e}")
+            self.report({'ERROR'}, rpt_("Replacement failed: {error}").format(error=e))
             return {'CANCELLED'}
         renames = {old: new for old, new in renames.items() if old != new}
         if not renames:
-            self.report({'INFO'}, "名前が変わるグループはありませんでした。")
+            self.report({'INFO'}, rpt_("No group names would change."))
             return {'CANCELLED'}
 
         error = self._validate(ob, renames)
@@ -192,19 +195,21 @@ class L0C_VGU_OT_rename(_MeshPoll, bpy.types.Operator):
             if ob.l0c_vgu.last_toggled in renames:
                 ob.l0c_vgu.last_toggled = renames[ob.l0c_vgu.last_toggled]
             state.update_snapshot(ob)
-        self.report({'INFO'}, f"{len(renames)} 個の頂点グループをリネームしました。")
+        self.report({'INFO'}, rpt_("Renamed {count} vertex groups.").format(count=len(renames)))
         return {'FINISHED'}
 
     @staticmethod
     def _validate(ob, renames):
         new_names = list(renames.values())
         if any(not n for n in new_names):
-            return "名前が空になるグループがあります。"
+            return rpt_("Some groups would get an empty name.")
         too_long = [n for n in new_names if len(n.encode("utf-8")) > MAX_NAME_BYTES]
         if too_long:
-            return f"名前が {MAX_NAME_BYTES} バイトを超えます: {', '.join(too_long)}"
+            return rpt_("Names longer than {max} bytes: {names}").format(
+                max=MAX_NAME_BYTES, names=", ".join(too_long),
+            )
         if any(n.startswith(order.TEMP_PREFIX) for n in new_names):
-            return f"「{order.TEMP_PREFIX}」で始まる名前は使えません。"
+            return rpt_("Names starting with \"{prefix}\" are not allowed.").format(prefix=order.TEMP_PREFIX)
         kept = {vg.name for vg in ob.vertex_groups if vg.name not in renames}
         seen = set()
         duplicates = []
@@ -213,32 +218,37 @@ class L0C_VGU_OT_rename(_MeshPoll, bpy.types.Operator):
                 duplicates.append(n)
             seen.add(n)
         if duplicates:
-            return f"変更後の名前が重複します: {', '.join(sorted(set(duplicates)))}"
+            return rpt_("Duplicate names after renaming: {names}").format(
+                names=", ".join(sorted(set(duplicates))),
+            )
         return None
 
 
 class L0C_VGU_OT_create_opposite(_MeshPoll, bpy.types.Operator):
     bl_idname = "l0c_vgu.create_opposite"
-    bl_label = "逆側のグループを生成"
-    bl_description = "選択中の L/R のグループから逆側のグループを作り、元のグループの直後に置きます"
+    bl_label = "Create Opposite Groups"
+    bl_description = (
+        "Create opposite-side groups from the selected L/R groups "
+        "and place each one right after its source group"
+    )
     bl_options = {'REGISTER', 'UNDO'}
 
     weight_mode: EnumProperty(
-        name="ウェイト",
+        name="Weights",
         items=(
-            ('MIRROR', "X 軸で反転してコピー", "元のグループのウェイトを X 軸で反転してコピーします"),
-            ('EMPTY', "空のグループ", "名前だけ作り、ウェイトはコピーしません"),
+            ('MIRROR', "Mirror on X Axis", "Copy the weights of the source group mirrored on the X axis"),
+            ('EMPTY', "Empty Group", "Create the group by name only without copying weights"),
         ),
     )
     use_topology: BoolProperty(
-        name="トポロジーミラー",
-        description="頂点の位置ではなくメッシュのつながりで反対側の頂点を探します",
+        name="Topology Mirror",
+        description="Find opposite vertices by mesh connectivity instead of position",
         default=False,
     )
 
     def invoke(self, context, _event):
         if not state.selected_names(state.mesh_object(context)):
-            self.report({'ERROR'}, "グループが選択されていません。")
+            self.report({'ERROR'}, rpt_("No groups are selected."))
             return {'CANCELLED'}
         return context.window_manager.invoke_props_dialog(self, width=320)
 
@@ -299,11 +309,15 @@ class L0C_VGU_OT_create_opposite(_MeshPoll, bpy.types.Operator):
                 return {'CANCELLED'}
         state.sync(ob)
 
-        messages = [f"{len(created)} 個のグループを生成しました。"]
+        messages = [rpt_("Created {count} groups.").format(count=len(created))]
         if existing:
-            messages.append(f"逆側が既にあるためスキップ: {', '.join(existing)}")
+            messages.append(
+                rpt_("Skipped because the opposite group exists: {names}").format(names=", ".join(existing))
+            )
         if no_side:
-            messages.append(f"L/R のサフィックスがないためスキップ: {', '.join(no_side)}")
+            messages.append(
+                rpt_("Skipped because there is no L/R suffix: {names}").format(names=", ".join(no_side))
+            )
         self.report({'WARNING'} if existing or no_side else {'INFO'}, " ".join(messages))
         return {'FINISHED'}
 
@@ -316,7 +330,7 @@ class L0C_VGU_OT_create_opposite(_MeshPoll, bpy.types.Operator):
         vgroups.active_index = vgroups[source].index
         with context.temp_override(object=ob, active_object=ob):
             if 'FINISHED' not in bpy.ops.object.vertex_group_copy():
-                raise RuntimeError(f"「{source}」をコピーできませんでした。")
+                raise RuntimeError(rpt_("Could not copy \"{name}\".").format(name=source))
             copied = vgroups.active
             if 'FINISHED' not in bpy.ops.object.vertex_group_mirror(
                 mirror_weights=True,
@@ -324,33 +338,33 @@ class L0C_VGU_OT_create_opposite(_MeshPoll, bpy.types.Operator):
                 all_groups=False,
                 use_topology=self.use_topology,
             ):
-                raise RuntimeError(f"「{source}」のウェイトを反転できませんでした。")
+                raise RuntimeError(rpt_("Could not mirror the weights of \"{name}\".").format(name=source))
         copied.name = opposite
 
 
 class L0C_VGU_OT_vertex_assign(_MeshPoll, bpy.types.Operator):
     bl_idname = "l0c_vgu.vertex_assign"
-    bl_label = "選択中のグループの頂点操作"
+    bl_label = "Vertex Operations on Selected Groups"
     bl_options = {'REGISTER', 'UNDO'}
 
     action: EnumProperty(
-        name="操作",
+        name="Action",
         items=(
-            ('ASSIGN', "割り当て", ""),
-            ('REMOVE', "除去", ""),
-            ('SELECT', "選択", ""),
-            ('DESELECT', "選択解除", ""),
+            ('ASSIGN', "Assign", ""),
+            ('REMOVE', "Remove", ""),
+            ('SELECT', "Select", ""),
+            ('DESELECT', "Deselect", ""),
         ),
     )
 
     @classmethod
     def description(cls, _context, properties):
-        return {
-            'ASSIGN': "選択している頂点を、選択中のすべてのグループに割り当てます",
-            'REMOVE': "選択している頂点を、選択中のすべてのグループから除去します",
-            'SELECT': "選択中のすべてのグループに属する頂点を選択します",
-            'DESELECT': "選択中のすべてのグループに属する頂点の選択を解除します",
-        }[properties.action]
+        return tip_({
+            'ASSIGN': "Assign the selected vertices to all selected groups",
+            'REMOVE': "Remove the selected vertices from all selected groups",
+            'SELECT': "Select the vertices that belong to the selected groups",
+            'DESELECT': "Deselect the vertices that belong to the selected groups",
+        }[properties.action])
 
     def execute(self, context):
         ob = state.mesh_object(context)
@@ -370,7 +384,7 @@ class L0C_VGU_OT_vertex_assign(_MeshPoll, bpy.types.Operator):
         try:
             with context.temp_override(object=ob, active_object=ob):
                 if not operator.poll():
-                    self.report({'ERROR'}, "編集モードで実行してください。")
+                    self.report({'ERROR'}, rpt_("Run this in Edit Mode."))
                     return {'CANCELLED'}
                 for name in names:
                     vgroups.active_index = vgroups[name].index
@@ -382,34 +396,35 @@ class L0C_VGU_OT_vertex_assign(_MeshPoll, bpy.types.Operator):
 
 class L0C_VGU_OT_copy_to_selected(_MeshPoll, bpy.types.Operator):
     bl_idname = "l0c_vgu.copy_to_selected"
-    bl_label = "他オブジェクトへコピー"
-    bl_description = "選択中のグループをウェイトごと、ほかに選択しているメッシュオブジェクトへコピーします"
+    bl_label = "Copy to Other Objects"
+    bl_description = "Copy the selected groups with their weights to the other selected mesh objects"
     bl_options = {'REGISTER', 'UNDO'}
 
     mapping: EnumProperty(
-        name="対応付け",
+        name="Mapping",
         items=(
-            ('INDEX', "頂点インデックス", "同じインデックスの頂点にコピーします。頂点数が違うオブジェクトはスキップします"),
-            ('NEAREST', "最近傍頂点", "ワールド座標で最も近い頂点のウェイトをコピーします"),
+            ('INDEX', "Vertex Index",
+             "Copy to the vertices with the same index. Objects with a different vertex count are skipped"),
+            ('NEAREST', "Nearest Vertex", "Copy the weights of the nearest vertex in world space"),
         ),
     )
     max_distance: FloatProperty(
-        name="最大距離",
-        description="これより離れた頂点にはコピーしません。0 のときは距離を制限しません",
+        name="Max Distance",
+        description="Vertices farther than this are not copied to. 0 means no limit",
         default=0.0,
         min=0.0,
         subtype='DISTANCE',
     )
     conflict: EnumProperty(
-        name="同名のグループ",
+        name="Existing Groups",
         items=(
-            ('REPLACE', "置き換え", "既存のグループのウェイトを消してからコピーします"),
-            ('SKIP', "スキップ", "既存のグループには何もしません"),
+            ('REPLACE', "Overwrite", "Clear the weights of the existing group before copying"),
+            ('SKIP', "Skip", "Leave existing groups unchanged"),
         ),
     )
     match_order: BoolProperty(
-        name="並び順をコピー元にそろえる",
-        description="コピー先で、コピー元にあるグループの並びをコピー元と同じ順にします",
+        name="Match Source Order",
+        description="Order the copied groups in the target the same way as in the source",
         default=False,
     )
 
@@ -440,7 +455,7 @@ class L0C_VGU_OT_copy_to_selected(_MeshPoll, bpy.types.Operator):
             if o is not source and o.type == 'MESH' and o.is_editable
         ]
         if not targets:
-            self.report({'ERROR'}, "コピー先のメッシュオブジェクトを選択してください。")
+            self.report({'ERROR'}, rpt_("Select the mesh objects to copy to."))
             return {'CANCELLED'}
 
         weights = self._read_weights(source, names)
@@ -462,9 +477,12 @@ class L0C_VGU_OT_copy_to_selected(_MeshPoll, bpy.types.Operator):
                 return {'CANCELLED'}
 
         if skipped:
-            self.report({'WARNING'}, f"頂点数が違うためスキップしました: {', '.join(skipped)}")
+            self.report(
+                {'WARNING'},
+                rpt_("Skipped due to a different vertex count: {names}").format(names=", ".join(skipped)),
+            )
         else:
-            self.report({'INFO'}, f"{len(targets)} 個のオブジェクトへコピーしました。")
+            self.report({'INFO'}, rpt_("Copied to {count} objects.").format(count=len(targets)))
         return {'FINISHED'}
 
     @staticmethod

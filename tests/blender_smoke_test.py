@@ -180,7 +180,8 @@ def test_batch_ops():
         run(ob, bpy.ops.l0c_vgu.rename, mode='REPLACE', find="Leg", replace="Arm")
         failures.append("rename conflict: should fail")
     except RuntimeError as e:
-        check("rename conflict", "重複" in str(e), True)
+        # UI 言語に依存しないよう、重複した名前がメッセージに含まれるかで確認する
+        check("rename conflict", "Arm.L" in str(e), True)
     check("rename conflict names", names(ob), ["Arm.R", "Arm.L", "Leg.L", "Body"])
 
     select(ob, ["Leg.L", "Body"])
