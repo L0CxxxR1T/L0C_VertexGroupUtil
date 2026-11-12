@@ -162,16 +162,11 @@ def draw_panel(panel, context):
         sub.operator("object.vertex_group_deselect", text="Deselect")
 
         if selected_count:
-            col = layout.column(align=True)
-            col.label(text=iface_("{count} Selected Groups").format(count=selected_count), translate=False)
-            row = col.row()
-            sub = row.row(align=True)
-            sub.operator("l0c_vgu.vertex_assign", text="Assign").action = 'ASSIGN'
-            sub.operator("l0c_vgu.vertex_assign", text="Remove").action = 'REMOVE'
-            sub = row.row(align=True)
-            sub.operator("l0c_vgu.vertex_assign", text="Select").action = 'SELECT'
-            sub.operator("l0c_vgu.vertex_assign", text="Deselect").action = 'DESELECT'
-
+            # 標準のボタンと並ぶと見分けにくいので、既定では閉じておく
+            header, body = layout.panel("L0C_VGU_selected_vertex_ops", default_closed=True)
+            header.label(text=iface_("{count} Selected Groups").format(count=selected_count), translate=False)
+            if body is not None:
+                _draw_selected_vertex_ops(body)
         col = layout.column(align=True)
         col.separator()
         col.use_property_split = True
@@ -180,6 +175,16 @@ def draw_panel(panel, context):
         col.prop(context.tool_settings, "use_auto_normalize", text="Auto Normalize")
 
     draw_attribute_warnings(context, layout, None)
+
+
+def _draw_selected_vertex_ops(layout):
+    row = layout.row()
+    sub = row.row(align=True)
+    sub.operator("l0c_vgu.vertex_assign", text="Assign").action = 'ASSIGN'
+    sub.operator("l0c_vgu.vertex_assign", text="Remove").action = 'REMOVE'
+    sub = row.row(align=True)
+    sub.operator("l0c_vgu.vertex_assign", text="Select").action = 'SELECT'
+    sub.operator("l0c_vgu.vertex_assign", text="Deselect").action = 'DESELECT'
 
 
 def _draw_selection_tools(layout, ob, selected_count):
