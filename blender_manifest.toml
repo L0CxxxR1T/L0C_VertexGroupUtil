@@ -3,7 +3,7 @@ schema_version = "1.0.0"
 id = "l0c_vertex_group_util"
 version = "0.1.0"
 name = "L0C Vertex Group Util"
-tagline = "頂点グループのリストに複数選択と並べ替えの強化を追加"
+tagline = "Adds multi-select and sorting tools to the vertex group list"
 maintainer = "xxxL0C <contact@xxxl0c.works>"
 type = "add-on"
 
@@ -14,7 +14,7 @@ blender_version_min = "5.2.0"
 license = ["SPDX:GPL-2.0-or-later"]
 
 [permissions]
-files = "並べ替え用の辞書CSVを読み込み、書き出すため"
+files = "Import and export dictionary CSV files for sorting"
 
 [build]
 paths_exclude_pattern = [

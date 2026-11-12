@@ -35,8 +35,8 @@ def _on_selected_update(self, _context):
 class L0C_VGU_GroupState(bpy.types.PropertyGroup):
     # name は頂点グループ名と同じ値を持つ
     selected: BoolProperty(
-        name="選択",
-        description="一括操作と並べ替えの対象にします",
+        name="Selected",
+        description="Include this group in batch operations and sorting",
         update=_on_selected_update,
     )
 

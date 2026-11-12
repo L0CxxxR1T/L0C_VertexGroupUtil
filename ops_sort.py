@@ -3,13 +3,15 @@
 """選択中のグループの移動と並べ替え。"""
 
 import bpy
+from bpy.app.translations import pgettext_rpt as rpt_
+from bpy.app.translations import pgettext_tip as tip_
 from bpy.props import BoolProperty, EnumProperty, IntProperty, StringProperty
 
 from . import order, prefs, state
 
 SCOPE_ITEMS = (
-    ('SELECTED', "選択中のみ", "選択中のグループが今いる位置の中だけで並べ替えます"),
-    ('ALL', "全体", "すべてのグループを並べ替えます"),
+    ('SELECTED', "Selected Only", "Sort only within the positions the selected groups occupy"),
+    ('ALL', "All", "Sort all groups"),
 )
 
 
@@ -27,7 +29,7 @@ def _reorder_in_scope(op, context, ob, scope, reorder):
     if scope == 'SELECTED':
         selected = set(state.selected_names(ob))
         if not selected:
-            op.report({'ERROR'}, "グループが選択されていません。")
+            op.report({'ERROR'}, rpt_("No groups are selected."))
             return {'CANCELLED'}
         desired = order.reorder_slots(names, selected, reorder)
     else:
@@ -44,33 +46,33 @@ class _SelectedMeshPoll:
 
 class L0C_VGU_OT_move_selected(_SelectedMeshPoll, bpy.types.Operator):
     bl_idname = "l0c_vgu.move_selected"
-    bl_label = "選択中のグループを移動"
+    bl_label = "Move Selected Groups"
     bl_options = {'REGISTER', 'UNDO'}
 
     direction: EnumProperty(
-        name="方向",
+        name="Direction",
         items=(
-            ('TOP', "先頭へ", ""),
-            ('UP', "上へ", ""),
-            ('DOWN', "下へ", ""),
-            ('BOTTOM', "末尾へ", ""),
+            ('TOP', "To Top", ""),
+            ('UP', "Up", ""),
+            ('DOWN', "Down", ""),
+            ('BOTTOM', "To Bottom", ""),
         ),
     )
 
     @classmethod
     def description(cls, _context, properties):
-        return {
-            'TOP': "選択中のグループを先頭へ移動します",
-            'UP': "選択中のグループを1つ上へ移動します",
-            'DOWN': "選択中のグループを1つ下へ移動します",
-            'BOTTOM': "選択中のグループを末尾へ移動します",
-        }[properties.direction]
+        return tip_({
+            'TOP': "Move the selected groups to the top",
+            'UP': "Move the selected groups up by one",
+            'DOWN': "Move the selected groups down by one",
+            'BOTTOM': "Move the selected groups to the bottom",
+        }[properties.direction])
 
     def execute(self, context):
         ob = state.mesh_object(context)
         selected = set(state.selected_names(ob))
         if not selected:
-            self.report({'ERROR'}, "グループが選択されていません。")
+            self.report({'ERROR'}, rpt_("No groups are selected."))
             return {'CANCELLED'}
         names = [vg.name for vg in ob.vertex_groups]
         if self.direction == 'UP':
@@ -86,13 +88,13 @@ class L0C_VGU_OT_move_selected(_SelectedMeshPoll, bpy.types.Operator):
 
 class L0C_VGU_OT_move_selected_to(_SelectedMeshPoll, bpy.types.Operator):
     bl_idname = "l0c_vgu.move_selected_to"
-    bl_label = "指定位置へ移動"
-    bl_description = "選択中のグループを、相対順を保ったまま指定した位置へ移動します"
+    bl_label = "Move to Position"
+    bl_description = "Move the selected groups to the given position, keeping their relative order"
     bl_options = {'REGISTER', 'UNDO'}
 
     position: IntProperty(
-        name="位置",
-        description="移動後に先頭のグループが来る位置です。1 が先頭です",
+        name="Position",
+        description="Position of the first moved group. 1 is the top",
         default=1,
         min=1,
     )
@@ -104,7 +106,7 @@ class L0C_VGU_OT_move_selected_to(_SelectedMeshPoll, bpy.types.Operator):
         ob = state.mesh_object(context)
         selected = set(state.selected_names(ob))
         if not selected:
-            self.report({'ERROR'}, "グループが選択されていません。")
+            self.report({'ERROR'}, rpt_("No groups are selected."))
             return {'CANCELLED'}
         names = [vg.name for vg in ob.vertex_groups]
         return _apply(self, context, ob, order.move_to(names, selected, self.position - 1))
@@ -112,33 +114,33 @@ class L0C_VGU_OT_move_selected_to(_SelectedMeshPoll, bpy.types.Operator):
 
 class L0C_VGU_OT_sort(_SelectedMeshPoll, bpy.types.Operator):
     bl_idname = "l0c_vgu.sort"
-    bl_label = "頂点グループを並べ替え"
+    bl_label = "Sort Vertex Groups"
     bl_options = {'REGISTER', 'UNDO'}
 
     method: EnumProperty(
-        name="方法",
+        name="Method",
         items=(
-            ('BONE', "ボーン順", "アーマチュアのボーンの並び順に合わせます"),
-            ('REVERSE', "逆順", "並びを反転します"),
-            ('EMPTY_LAST', "空グループを末尾へ", "ウェイトが割り当てられていないグループを末尾へ送ります"),
+            ('BONE', "By Bone", "Match the order of the armature's bones"),
+            ('REVERSE', "Reverse", "Reverse the order"),
+            ('EMPTY_LAST', "Empty Groups Last", "Move groups with no assigned weights to the end"),
         ),
     )
-    scope: EnumProperty(name="対象", items=SCOPE_ITEMS)
+    scope: EnumProperty(name="Scope", items=SCOPE_ITEMS)
     zero_as_empty: BoolProperty(
-        name="ウェイト 0 も空とみなす",
-        description="ウェイトが 0 の割り当てしかないグループも空グループとして扱います",
+        name="Treat Zero Weights as Empty",
+        description="Also treat groups that only have zero weights as empty",
         default=False,
     )
 
     @classmethod
     def description(cls, _context, properties):
         method = {
-            'BONE': "アーマチュアのボーンの並び順に合わせます。ボーンがないグループは末尾に置きます",
-            'REVERSE': "並びを反転します",
-            'EMPTY_LAST': "ウェイトが割り当てられていないグループを末尾へ送ります",
+            'BONE': "Match the order of the armature's bones. Groups without a bone go to the end",
+            'REVERSE': "Reverse the order",
+            'EMPTY_LAST': "Move groups with no assigned weights to the end",
         }[properties.method]
-        scope = "選択中のグループが対象です" if properties.scope == 'SELECTED' else "すべてのグループが対象です"
-        return f"{method}。{scope}"
+        scope = "Applies to the selected groups" if properties.scope == 'SELECTED' else "Applies to all groups"
+        return tip_("{method}. {scope}").format(method=tip_(method), scope=tip_(scope))
 
     def execute(self, context):
         ob = state.mesh_object(context)
@@ -146,7 +148,7 @@ class L0C_VGU_OT_sort(_SelectedMeshPoll, bpy.types.Operator):
         if self.method == 'BONE':
             armature = order.find_armature(ob)
             if armature is None:
-                self.report({'ERROR'}, "Armature モディファイアの対象か、親のアーマチュアが見つかりません。")
+                self.report({'ERROR'}, rpt_("No Armature modifier target or parent armature was found."))
                 return {'CANCELLED'}
             bone_index = {bone.name: i for i, bone in enumerate(armature.data.bones)}
 
@@ -169,19 +171,22 @@ class L0C_VGU_OT_sort(_SelectedMeshPoll, bpy.types.Operator):
 
 class L0C_VGU_OT_sort_dictionary(_SelectedMeshPoll, bpy.types.Operator):
     bl_idname = "l0c_vgu.sort_dictionary"
-    bl_label = "辞書順に並べ替え"
-    bl_description = "プリファレンスに登録した辞書の行順に並べ替えます。辞書にないグループは末尾に置きます"
+    bl_label = "Sort by Dictionary"
+    bl_description = (
+        "Sort by the line order of a dictionary registered in the Preferences. "
+        "Groups not in the dictionary go to the end"
+    )
     bl_options = {'REGISTER', 'UNDO'}
 
-    dictionary_name: StringProperty(name="辞書")
-    scope: EnumProperty(name="対象", items=SCOPE_ITEMS)
+    dictionary_name: StringProperty(name="Dictionary")
+    scope: EnumProperty(name="Scope", items=SCOPE_ITEMS)
 
     def execute(self, context):
         ob = state.mesh_object(context)
         addon_prefs = prefs.get_prefs(context)
         dictionary = addon_prefs.dictionaries.get(self.dictionary_name) if addon_prefs else None
         if dictionary is None:
-            self.report({'ERROR'}, f"辞書「{self.dictionary_name}」が登録されていません。")
+            self.report({'ERROR'}, rpt_("Dictionary \"{name}\" is not registered.").format(name=self.dictionary_name))
             return {'CANCELLED'}
         rank = order.dictionary_rank(dictionary.get_entries())
 

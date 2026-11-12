@@ -4,6 +4,7 @@
 
 import bpy
 from bl_ui.properties_data_mesh import draw_attribute_warnings
+from bpy.app.translations import pgettext_iface as iface_
 from bpy.props import BoolProperty
 
 from . import prefs, state
@@ -15,8 +16,8 @@ _original_draw = None
 
 class L0C_VGU_UL_vgroups(bpy.types.UIList):
     show_selected_only: BoolProperty(
-        name="選択中のみ表示",
-        description="チェックが入ったグループだけを表示します",
+        name="Show Selected Only",
+        description="Show only checked groups",
         default=False,
     )
 
@@ -55,14 +56,14 @@ class L0C_VGU_UL_vgroups(bpy.types.UIList):
 
 
 class L0C_VGU_MT_dictionary_selected(bpy.types.Menu):
-    bl_label = "辞書順 (選択中のみ)"
+    bl_label = "By Dictionary (Selected Only)"
 
     def draw(self, context):
         _draw_dictionary_items(self.layout, context, 'SELECTED')
 
 
 class L0C_VGU_MT_dictionary_all(bpy.types.Menu):
-    bl_label = "辞書順 (全体)"
+    bl_label = "By Dictionary (All)"
 
     def draw(self, context):
         _draw_dictionary_items(self.layout, context, 'ALL')
@@ -71,55 +72,56 @@ class L0C_VGU_MT_dictionary_all(bpy.types.Menu):
 def _draw_dictionary_items(layout, context, scope):
     addon_prefs = prefs.get_prefs(context)
     if addon_prefs is None or not addon_prefs.dictionaries:
-        layout.label(text="辞書が登録されていません。プリファレンスで登録してください。")
+        layout.label(text="No dictionaries are registered. Register one in the Preferences.")
         return
     for dictionary in addon_prefs.dictionaries:
-        op = layout.operator("l0c_vgu.sort_dictionary", text=dictionary.name)
+        # 辞書名はユーザーが付けた名前なので翻訳しない
+        op = layout.operator("l0c_vgu.sort_dictionary", text=dictionary.name, translate=False)
         op.dictionary_name = dictionary.name
         op.scope = scope
 
 
 class L0C_VGU_MT_sort(bpy.types.Menu):
-    bl_label = "並べ替え"
+    bl_label = "Sort"
 
     def draw(self, _context):
         layout = self.layout
-        layout.operator("l0c_vgu.move_selected_to", text="選択中を指定位置へ移動...")
+        layout.operator("l0c_vgu.move_selected_to", text="Move Selected to Position...")
 
         for scope, label, dictionary_menu in (
-            ('SELECTED', "選択中のみ", "L0C_VGU_MT_dictionary_selected"),
-            ('ALL', "全体", "L0C_VGU_MT_dictionary_all"),
+            ('SELECTED', "Selected Only", "L0C_VGU_MT_dictionary_selected"),
+            ('ALL', "All", "L0C_VGU_MT_dictionary_all"),
         ):
             layout.separator()
             layout.label(text=label)
             for method, text in (
-                ('BONE', "ボーン順"),
-                ('REVERSE', "逆順"),
-                ('EMPTY_LAST', "空グループを末尾へ"),
+                ('BONE', "By Bone"),
+                ('REVERSE', "Reverse"),
+                ('EMPTY_LAST', "Empty Groups Last"),
             ):
                 op = layout.operator("l0c_vgu.sort", text=text)
                 op.method = method
                 op.scope = scope
-            layout.menu(dictionary_menu, text="辞書順")
+            layout.menu(dictionary_menu, text="By Dictionary")
 
         layout.separator()
-        layout.operator("object.vertex_group_sort", text="ボーン階層順 (全体)").sort_type = 'BONE_HIERARCHY'
+        layout.operator("object.vertex_group_sort", text="By Bone Hierarchy (All)").sort_type = 'BONE_HIERARCHY'
 
 
 class L0C_VGU_MT_batch(bpy.types.Menu):
-    bl_label = "一括操作"
+    bl_label = "Batch Operations"
 
     def draw(self, _context):
         layout = self.layout
-        layout.operator("l0c_vgu.rename", text="リネーム...", icon='SORTALPHA')
-        layout.operator("l0c_vgu.create_opposite", text="逆側のグループを生成...", icon='MOD_MIRROR')
-        layout.operator("l0c_vgu.copy_to_selected", text="他オブジェクトへコピー...", icon='COPYDOWN')
+        layout.operator("l0c_vgu.rename", text="Rename...", icon='SORTALPHA')
+        layout.operator("l0c_vgu.create_opposite", text="Create Opposite Groups...", icon='MOD_MIRROR')
+        layout.operator("l0c_vgu.copy_to_selected", text="Copy to Other Objects...", icon='COPYDOWN')
         layout.separator()
-        layout.operator("l0c_vgu.set_lock", text="ロック", icon='LOCKED').action = 'LOCK'
-        layout.operator("l0c_vgu.set_lock", text="ロック解除", icon='UNLOCKED').action = 'UNLOCK'
-        layout.operator("l0c_vgu.set_lock", text="ロック反転", icon='ARROW_LEFTRIGHT').action = 'INVERT'
+        layout.operator("l0c_vgu.set_lock", text="Lock", icon='LOCKED').action = 'LOCK'
+        layout.operator("l0c_vgu.set_lock", text="Unlock", icon='UNLOCKED').action = 'UNLOCK'
+        layout.operator("l0c_vgu.set_lock", text="Invert Lock", icon='ARROW_LEFTRIGHT').action = 'INVERT'
         layout.separator()
-        layout.operator("l0c_vgu.delete_selected", text="削除", icon='X')
+        layout.operator("l0c_vgu.delete_selected", text="Delete", icon='X')
 
 
 def draw_panel(panel, context):
@@ -161,14 +163,14 @@ def draw_panel(panel, context):
 
         if selected_count:
             col = layout.column(align=True)
-            col.label(text=f"選択中の {selected_count} グループ")
+            col.label(text=iface_("{count} Selected Groups").format(count=selected_count), translate=False)
             row = col.row()
             sub = row.row(align=True)
-            sub.operator("l0c_vgu.vertex_assign", text="割り当て").action = 'ASSIGN'
-            sub.operator("l0c_vgu.vertex_assign", text="除去").action = 'REMOVE'
+            sub.operator("l0c_vgu.vertex_assign", text="Assign").action = 'ASSIGN'
+            sub.operator("l0c_vgu.vertex_assign", text="Remove").action = 'REMOVE'
             sub = row.row(align=True)
-            sub.operator("l0c_vgu.vertex_assign", text="選択").action = 'SELECT'
-            sub.operator("l0c_vgu.vertex_assign", text="選択解除").action = 'DESELECT'
+            sub.operator("l0c_vgu.vertex_assign", text="Select").action = 'SELECT'
+            sub.operator("l0c_vgu.vertex_assign", text="Deselect").action = 'DESELECT'
 
         col = layout.column(align=True)
         col.separator()
@@ -185,14 +187,14 @@ def _draw_selection_tools(layout, ob, selected_count):
     sub = row.row(align=True)
     sub.operator("l0c_vgu.select_all", text="", icon='CHECKBOX_HLT').action = 'SELECT'
     sub.operator("l0c_vgu.select_all", text="", icon='CHECKBOX_DEHLT').action = 'DESELECT'
-    sub.operator("l0c_vgu.select_all", text="反転").action = 'INVERT'
-    sub.operator("l0c_vgu.select_range", text="範囲")
+    sub.operator("l0c_vgu.select_all", text="Invert").action = 'INVERT'
+    sub.operator("l0c_vgu.select_range", text="Range")
     sub = row.row(align=True)
-    sub.operator("l0c_vgu.select_side", text="L").side = 'L'
-    sub.operator("l0c_vgu.select_side", text="R").side = 'R'
+    sub.operator("l0c_vgu.select_side", text="L", translate=False).side = 'L'
+    sub.operator("l0c_vgu.select_side", text="R", translate=False).side = 'R'
     sub = row.row()
     sub.alignment = 'RIGHT'
-    sub.label(text=f"{selected_count} / {len(ob.vertex_groups)}")
+    sub.label(text=f"{selected_count} / {len(ob.vertex_groups)}", translate=False)
 
     row = layout.row()
     sub = row.row(align=True)
@@ -226,7 +228,7 @@ def _install_override():
             _original_draw = func
             draw_funcs[i] = _draw_override
             return
-    raise RuntimeError("標準の頂点グループパネルの描画関数が見つかりません。")
+    raise RuntimeError("Could not find the draw function of the default vertex group panel.")
 
 
 def _uninstall_override():

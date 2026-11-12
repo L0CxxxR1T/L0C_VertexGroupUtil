@@ -3,6 +3,8 @@
 """チェックボックスの選択操作。"""
 
 import bpy
+from bpy.app.translations import pgettext_rpt as rpt_
+from bpy.app.translations import pgettext_tip as tip_
 from bpy.props import BoolProperty, EnumProperty, StringProperty
 
 from . import sides, state
@@ -10,26 +12,26 @@ from . import sides, state
 
 class L0C_VGU_OT_select_all(bpy.types.Operator):
     bl_idname = "l0c_vgu.select_all"
-    bl_label = "頂点グループの選択"
-    bl_description = "頂点グループのチェックをまとめて切り替えます"
+    bl_label = "Select Vertex Groups"
+    bl_description = "Change the checks of the vertex groups at once"
     bl_options = {'REGISTER', 'UNDO'}
 
     action: EnumProperty(
-        name="操作",
+        name="Action",
         items=(
-            ('SELECT', "全選択", "すべてのグループにチェックを入れます"),
-            ('DESELECT', "全解除", "すべてのグループのチェックを外します"),
-            ('INVERT', "反転", "チェックの有無を反転します"),
+            ('SELECT', "Select All", "Check all groups"),
+            ('DESELECT', "Deselect All", "Uncheck all groups"),
+            ('INVERT', "Invert", "Invert the checks"),
         ),
     )
 
     @classmethod
     def description(cls, _context, properties):
-        return {
-            'SELECT': "すべてのグループにチェックを入れます",
-            'DESELECT': "すべてのグループのチェックを外します",
-            'INVERT': "チェックの有無を反転します",
-        }[properties.action]
+        return tip_({
+            'SELECT': "Check all groups",
+            'DESELECT': "Uncheck all groups",
+            'INVERT': "Invert the checks",
+        }[properties.action])
 
     @classmethod
     def poll(cls, context):
@@ -50,10 +52,10 @@ class L0C_VGU_OT_select_all(bpy.types.Operator):
 
 class L0C_VGU_OT_select_range(bpy.types.Operator):
     bl_idname = "l0c_vgu.select_range"
-    bl_label = "範囲選択"
+    bl_label = "Select Range"
     bl_description = (
-        "アクティブのグループから、最後にチェックを切り替えたグループまでを、"
-        "そのグループと同じチェック状態にそろえます"
+        "Set the groups from the active group to the last toggled group "
+        "to the same check state as the last toggled group"
     )
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -68,7 +70,7 @@ class L0C_VGU_OT_select_range(bpy.types.Operator):
         vgroups = ob.vertex_groups
         anchor = vgroups.get(ob.l0c_vgu.last_toggled)
         if anchor is None:
-            self.report({'ERROR'}, "起点のグループが見つかりません。チェックボックスを1つ切り替えてから実行してください。")
+            self.report({'ERROR'}, rpt_("The start group was not found. Toggle a checkbox first, then run this again."))
             return {'CANCELLED'}
 
         value = ob.l0c_vgu.items[anchor.name].selected
@@ -79,28 +81,28 @@ class L0C_VGU_OT_select_range(bpy.types.Operator):
 
 class L0C_VGU_OT_select_side(bpy.types.Operator):
     bl_idname = "l0c_vgu.select_side"
-    bl_label = "L/R で選択"
+    bl_label = "Select by L/R"
     bl_options = {'REGISTER', 'UNDO'}
 
     side: EnumProperty(
-        name="側",
+        name="Side",
         items=(
             ('L', "L", ""),
             ('R', "R", ""),
         ),
     )
     extend: BoolProperty(
-        name="追加選択",
-        description="今の選択を残したまま追加します",
+        name="Extend",
+        description="Add to the current selection instead of replacing it",
         default=False,
     )
 
     @classmethod
     def description(cls, _context, properties):
-        return (
-            f"名前が .{properties.side} や _{properties.side.lower()} などで終わるグループを選択します。"
-            "Shift+クリックで今の選択に追加します"
-        )
+        return tip_(
+            "Select groups whose names end with .{side}, _{side_lower} and so on. "
+            "Shift-click to add to the current selection"
+        ).format(side=properties.side, side_lower=properties.side.lower())
 
     @classmethod
     def poll(cls, context):
@@ -119,7 +121,7 @@ class L0C_VGU_OT_select_side(bpy.types.Operator):
             state.set_selected(ob, names, False)
         state.set_selected(ob, matched, True)
         if not matched:
-            self.report({'INFO'}, f"{self.side} 側のグループはありませんでした。")
+            self.report({'INFO'}, rpt_("No groups found on the {side} side.").format(side=self.side))
         return {'FINISHED'}
 
 
@@ -127,8 +129,8 @@ class L0C_VGU_OT_toggle(bpy.types.Operator):
     """選択状態がまだ同期されていないグループ用のチェックボックス"""
 
     bl_idname = "l0c_vgu.toggle"
-    bl_label = "選択を切り替え"
-    bl_description = "このグループを一括操作と並べ替えの対象にします"
+    bl_label = "Toggle Selection"
+    bl_description = "Include this group in batch operations and sorting"
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
 
     name: StringProperty()
@@ -142,7 +144,7 @@ class L0C_VGU_OT_toggle(bpy.types.Operator):
         state.sync(ob)
         item = ob.l0c_vgu.items.get(self.name)
         if item is None:
-            self.report({'ERROR'}, f"頂点グループ「{self.name}」が見つかりません。")
+            self.report({'ERROR'}, rpt_("Vertex group \"{name}\" was not found.").format(name=self.name))
             return {'CANCELLED'}
         item.selected = not item.selected
         return {'FINISHED'}

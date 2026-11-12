@@ -5,6 +5,7 @@
 import re
 
 import bpy
+from bpy.app.translations import pgettext_rpt as rpt_
 
 from . import state
 
@@ -94,9 +95,11 @@ def apply_order(context, ob, desired):
     if current == desired:
         return
     if sorted(current) != sorted(desired):
-        raise ValueError("並べ替え後の名前一覧が現在の頂点グループと一致しません。")
+        raise ValueError(rpt_("The sorted name list does not match the current vertex groups."))
     if any(n.startswith(TEMP_PREFIX) for n in current):
-        raise RuntimeError(f"「{TEMP_PREFIX}」で始まる頂点グループがあるため並べ替えできません。")
+        raise RuntimeError(
+            rpt_("Cannot sort because a vertex group name starts with \"{prefix}\".").format(prefix=TEMP_PREFIX)
+        )
 
     active = vgroups.active
     active_name = active.name if active is not None else None
@@ -111,7 +114,7 @@ def apply_order(context, ob, desired):
             with context.temp_override(object=ob, active_object=ob):
                 result = bpy.ops.object.vertex_group_sort(sort_type='NAME')
             if 'FINISHED' not in result:
-                raise RuntimeError("頂点グループの並べ替えに失敗しました。")
+                raise RuntimeError(rpt_("Failed to sort the vertex groups."))
         finally:
             for vg in vgroups:
                 if vg.name.startswith(TEMP_PREFIX):
