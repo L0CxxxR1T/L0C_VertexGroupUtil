@@ -2,9 +2,9 @@ schema_version = "1.0.0"
 
 id = "l0c_vertex_group_util"
 version = "0.1.0"
-name = "L0C Vertex Group Util"
+name = "[xxxL0C] Vertex Group Util"
 tagline = "Adds multi-select and sorting tools to the vertex group list"
-maintainer = "xxxL0C <contact@xxxl0c.works>"
+maintainer = "xxxL0C <contact@dev.xxxl0c.works>"
 type = "add-on"
 
 tags = ["Mesh", "Rigging"]
